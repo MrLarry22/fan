@@ -1,0 +1,16 @@
+{
+  "name": "Fanview",
+  "short_name": "Fanview",
+  "description": "Premium subscription content platform connecting users with their favorite creators",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#2563eb",
+  "background_color": "#0f172a",
+  "display": "standalone",
+  "start_url": "/"
+}

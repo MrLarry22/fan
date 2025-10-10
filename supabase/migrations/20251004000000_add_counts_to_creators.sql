@@ -1,0 +1,4 @@
+ALTER TABLE creators
+ADD COLUMN total_subscribers INTEGER DEFAULT 0,
+ADD COLUMN total_likes INTEGER DEFAULT 0,
+ADD COLUMN media_count INTEGER DEFAULT 0;
