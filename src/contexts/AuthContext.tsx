@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, AuthError } from '@supabase/supabase-js';
 import { supabase, Profile } from '../lib/supabase';
+import { API_ENDPOINTS } from '../config/api';
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +12,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<{ error: AuthError | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastBackendLoginEmailRef = React.useRef<string | null>(null);
 
   useEffect(() => {
     // Get initial session
@@ -53,25 +56,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // First, try to get a backend token using the user's email
       if (user.email) {
-        try {
-          const backendResponse = await fetch('http://localhost:5000/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              email: user.email, 
-              password: 'oauth-login' // Special marker for OAuth logins
-            }),
-          });
+        // Avoid repeating backend login if we already have a token or have tried for this email
+        const existingToken = localStorage.getItem('authToken');
+        if (!existingToken && lastBackendLoginEmailRef.current !== user.email) {
+            try {
+            const backendResponse = await fetch(API_ENDPOINTS.auth.login, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                email: user.email, 
+                password: 'oauth-login' // Special marker for OAuth logins
+              }),
+            });
 
-          if (backendResponse.ok) {
-            const backendData = await backendResponse.json();
-            if (backendData.success && backendData.data.token) {
-              localStorage.setItem('authToken', backendData.data.token);
-              console.log('Auth token stored for OAuth user');
+            if (backendResponse.ok) {
+              const backendData = await backendResponse.json();
+              if (backendData.success && backendData.data.token) {
+                localStorage.setItem('authToken', backendData.data.token);
+                lastBackendLoginEmailRef.current = user.email;
+                console.log('Auth token stored for OAuth user');
+              }
             }
+          } catch (error) {
+            console.log('Backend token retrieval failed for OAuth user, continuing without it');
           }
-        } catch (error) {
-          console.log('Backend token retrieval failed for OAuth user, continuing without it');
         }
       }
 
@@ -107,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Starting sign-up process for:', email);
       
       // Use our custom backend for registration
-      const backendResponse = await fetch('http://localhost:5000/api/auth/register', {
+  const backendResponse = await fetch(API_ENDPOINTS.auth.register, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, fullName }),
@@ -143,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Starting sign-in process for:', email);
       
       // First, sign in with our custom backend to get the JWT
-      const backendResponse = await fetch('http://localhost:5000/api/auth/login', {
+  const backendResponse = await fetch(API_ENDPOINTS.auth.login, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -230,7 +238,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Remove the custom auth token
     localStorage.removeItem('authToken');
     // Sign out from Supabase
-    await supabase.auth.signOut();
+    lastBackendLoginEmailRef.current = null;
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn('Supabase signOut warning:', err);
+    }
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
@@ -250,6 +263,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user) return { error: { message: 'No user logged in' } as AuthError };
+
+    try {
+  const response = await fetch(`${API_ENDPOINTS.auth}/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { error: { message: data.message || 'Failed to update password' } as AuthError };
+      }
+
+      console.log('Password updated successfully');
+      // Sign out the user since the session is invalidated after password change
+      await supabase.auth.signOut();
+      await signOut();
+      return { error: null };
+    } catch (error) {
+      console.error('Password update error:', error);
+      return { error: { message: 'Failed to update password' } as AuthError };
+    }
+  };
+
   const value = {
     user,
     profile,
@@ -259,6 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithGoogle,
     signOut,
     updateProfile,
+    updatePassword,
   };
 
   return (

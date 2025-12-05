@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Shield, Eye, EyeOff, Key, Save } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function SecurityPage() {
+  const { updatePassword } = useAuth();
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -40,7 +42,11 @@ export default function SecurityPage() {
     setSuccess(false);
 
     try {
-      // TODO: Implement password change logic with Supabase
+      const { error } = await updatePassword(formData.currentPassword, formData.newPassword);
+      if (error) {
+        alert(error.message);
+        return;
+      }
       console.log('Password change requested');
       setSuccess(true);
       setFormData({
@@ -51,6 +57,7 @@ export default function SecurityPage() {
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       console.error('Error changing password:', error);
+      alert('Failed to change password');
     } finally {
       setLoading(false);
     }

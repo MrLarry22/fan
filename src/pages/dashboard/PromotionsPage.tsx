@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Gift, Clock, Star, Users } from 'lucide-react';
-import PayPalTopUp from '../../components/Payment/PayPalTopUp';
+// import PayPalTopUp from '../../components/Payment/PayPalTopUp'; // Removed: subscription-only
 
 interface Promotion {
   id: string;
@@ -229,13 +229,15 @@ export default function PromotionsPage() {
         </div>
       </div>
 
-      {/* PayPal Modal for Paid Promotions */}
+      {/* PayPal Modal for Paid Promotions - DISABLED: Subscription-only mode */}
+      {/*
       <PayPalTopUp
         isOpen={showPayPal}
         onClose={() => setShowPayPal(false)}
         onSuccess={handlePayPalSuccess}
         onError={handlePayPalError}
       />
+      */}
     </div>
   );
 }

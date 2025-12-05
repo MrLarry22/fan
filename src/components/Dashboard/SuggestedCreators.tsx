@@ -15,7 +15,7 @@ interface Creator {
   total_likes?: number;
 }
 
-const API_BASE_URL = 'http://localhost:5000/api';
+import { API_ENDPOINTS } from '../../config/api';
 
 export default function SuggestedCreators() {
   const navigate = useNavigate();
@@ -34,7 +34,7 @@ export default function SuggestedCreators() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`${API_BASE_URL}/creators`);
+      const response = await fetch(API_ENDPOINTS.creators);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

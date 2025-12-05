@@ -1,11 +1,18 @@
 import React from 'react';
 import { Wallet, Plus, CreditCard, ArrowUpRight } from 'lucide-react';
-import PayPalTopUp from '../../components/Payment/PayPalTopUp';
+import PayPalSubscription from '../../components/Payment/PayPalSubscription';
 
 export default function WalletPage() {
   const [showPayPal, setShowPayPal] = React.useState(false);
   const [walletBalance, setWalletBalance] = React.useState(0.00);
-  const [transactions, setTransactions] = React.useState<any[]>([]);
+  const [transactions, setTransactions] = React.useState<Array<{
+    id: number;
+    type: string;
+    amount: number;
+    date: string;
+    status: string;
+    paypalId: string;
+  }>>([]);
 
   const handlePayPalSuccess = (subscriptionId: string) => {
     console.log('PayPal subscription successful:', subscriptionId);
@@ -16,20 +23,21 @@ export default function WalletPage() {
     // Add transaction record
     const newTransaction = {
       id: Date.now(),
-      type: 'Top Up',
-      amount: 25.00,
+      type: 'Subscription',
+      amount: 5.00, // Monthly subscription amount
       date: new Date().toLocaleDateString(),
-      status: 'Completed',
+      status: 'Active',
       paypalId: subscriptionId
     };
     setTransactions(prev => [newTransaction, ...prev]);
     
-    alert('Wallet topped up successfully! $25.00 added to your account.');
+    alert('Subscription activated successfully! Monthly billing: $5.00');
+    setShowPayPal(false);
   };
 
-  const handlePayPalError = (error: any) => {
+  const handlePayPalError = (error: Error) => {
     console.error('PayPal error:', error);
-    alert('Payment failed. Please try again.');
+    alert('Subscription failed. Please try again.');
   };
 
   return (
@@ -174,13 +182,29 @@ export default function WalletPage() {
         </div>
       </div>
 
-      {/* PayPal Top-Up Modal */}
-      <PayPalTopUp
-        isOpen={showPayPal}
-        onClose={() => setShowPayPal(false)}
-        onSuccess={handlePayPalSuccess}
-        onError={handlePayPalError}
-      />
+      {/* PayPal Subscription Modal */}
+      {showPayPal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-2xl p-8 max-w-md w-full mx-4 border border-slate-700 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white font-poppins">Subscribe</h2>
+              <button 
+                onClick={() => setShowPayPal(false)} 
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                ×
+              </button>
+            </div>
+            <PayPalSubscription
+              amount="5.00"
+              currency="USD"
+              onSuccess={handlePayPalSuccess}
+              onError={handlePayPalError}
+              onCancel={() => setShowPayPal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

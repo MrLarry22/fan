@@ -20,10 +20,12 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  FileVideo
+  FileVideo,
+  MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Creator, Content } from '../lib/supabase';
+import AdminMessaging from '../components/Admin/AdminMessaging';
 
 
 interface AdminStats {
@@ -99,7 +101,7 @@ const CreatorAvatar: React.FC<{ creator: Creator; size?: 'small' | 'large'; clas
 export default function AdminDashboard() {
   const { profile } = useAuth();
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'creators' | 'content' | 'users' | 'revenue'>('creators');
+  const [activeTab, setActiveTab] = useState<'overview' | 'creators' | 'content' | 'users' | 'revenue' | 'messages'>('creators');
   const [creators, setCreators] = useState<Creator[]>([]);
   const [content, setContent] = useState<Content[]>([]);
   const [stats, setStats] = useState<AdminStats>({
@@ -267,23 +269,21 @@ const handleCreateCreator = async (e: React.FormEvent) => {
     }
 
     // Check if backend is running
-    const API_BASE = 'http://localhost:5000';
-    
     try {
-      const healthCheck = await fetch(`${API_BASE}/health`, {
+      const healthCheck = await fetch('http://localhost:3001/health', {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
         }
       });
       if (!healthCheck.ok) {
-        throw new Error('Backend server is not running. Please start the server on port 5000.');
+        throw new Error('Backend server is not running. Please start the server on port 3001.');
       }
       const healthData = await healthCheck.json();
       console.log('Backend health check:', healthData);
     } catch (err) {
       console.error('Health check failed:', err);
-      throw new Error('Cannot connect to backend server. Make sure the server is running on localhost:5000');
+      throw new Error('Cannot connect to backend server. Make sure the server is running on port 3001');
     }
 
     // For now, we'll create a simple creator without full auth flow
@@ -307,7 +307,7 @@ const handleCreateCreator = async (e: React.FormEvent) => {
       formData.append('banner', newCreator.banner_file);
     }
 
-    console.log('Sending request to:', `${API_BASE}/api/admin/creators/provision`);
+    console.log('Sending request to:', 'http://localhost:3001/api/admin/creators/provision');
     console.log('FormData contents:', {
       email: uniqueEmail,
       fullName: newCreator.display_name,
@@ -319,7 +319,7 @@ const handleCreateCreator = async (e: React.FormEvent) => {
     });
 
     // Call the backend test provision endpoint (temporarily without auth for testing)
-    const response = await fetch(`${API_BASE}/api/admin/creators/provision-test`, {
+    const response = await fetch('http://localhost:3001/api/admin/creators/provision-test', {
       method: 'POST',
       headers: {
         // No auth needed for test endpoint
@@ -422,15 +422,13 @@ const handleCreateCreator = async (e: React.FormEvent) => {
 
     try {
       // Check if backend is running
-      const API_BASE = 'http://localhost:5000';
-      
       try {
-        const healthCheck = await fetch(`${API_BASE}/health`);
+        const healthCheck = await fetch('http://localhost:3001/health');
         if (!healthCheck.ok) {
-          throw new Error('Backend server is not running. Please start the server on port 5000.');
+          throw new Error('Backend server is not running. Please start the server on port 3001.');
         }
       } catch {
-        throw new Error('Cannot connect to backend server. Make sure the server is running on localhost:5000');
+        throw new Error('Cannot connect to backend server. Make sure the server is running on port 3001');
       }
 
       // Create FormData for multipart upload
@@ -445,7 +443,7 @@ const handleCreateCreator = async (e: React.FormEvent) => {
       console.log('Selected creator database ID:', selectedCreatorId);
 
       // Call the backend content upload endpoint
-      const response = await fetch(`${API_BASE}/api/content/upload`, {
+      const response = await fetch('http://localhost:3001/api/content/upload', {
         method: 'POST',
         headers: {
           // Will add auth header later when authentication is properly set up
@@ -619,11 +617,12 @@ const handleCreateCreator = async (e: React.FormEvent) => {
             {[
               { id: 'creators', label: 'Creators', icon: Users },
               { id: 'content', label: 'Content', icon: FileText },
+              { id: 'messages', label: 'Messages', icon: MessageCircle },
               { id: 'overview', label: 'Overview', icon: BarChart3 },
             ].map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
-                onClick={() => setActiveTab(id as 'overview' | 'creators' | 'content' | 'users' | 'revenue')}
+                onClick={() => setActiveTab(id as 'overview' | 'creators' | 'content' | 'users' | 'revenue' | 'messages')}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
                   activeTab === id
                     ? 'bg-blue-600 text-white'
@@ -936,6 +935,9 @@ const handleCreateCreator = async (e: React.FormEvent) => {
             </div>
           </div>
         )}
+
+        {/* Messages Tab */}
+        {activeTab === 'messages' && <AdminMessaging />}
 
         {/* Create Creator Modal */}
         {showCreateCreator && (

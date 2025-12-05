@@ -8,13 +8,15 @@ import {
   Image as ImageIcon, 
   Lock,
   Star,
-  Calendar,
   MapPin,
-  ExternalLink
+  ExternalLink,
+  MessageCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
-import PayPalTopUp from '../components/Payment/PayPalTopUp';
+import PayPalEnhancedSubscription from '../components/Payment/PayPalEnhancedSubscription';
+import MessagingModal from '../components/Messaging/MessagingModal';
+import { API_ENDPOINTS } from '../config/api';
 
 
 interface CreatorProfile {
@@ -52,12 +54,8 @@ export default function CreatorProfilePage() {
   const [loading, setLoading] = useState(true);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [showPayPal, setShowPayPal] = useState(false);
+  const [showMessaging, setShowMessaging] = useState(false);
   const [likedContent, setLikedContent] = useState<Set<string>>(new Set());
-
-  // Fetch real creator data from API
-  useEffect(() => {
-    fetchCreatorData();
-  }, [username]);
 
   const fetchCreatorData = useCallback(async () => {
     console.log('fetchCreatorData: Starting fetch for username:', username);
@@ -68,11 +66,9 @@ export default function CreatorProfilePage() {
 
     try {
       setLoading(true);
-      const API_BASE = 'http://localhost:5000';
-
-      // Fetch creator details
-      console.log('fetchCreatorData: Fetching creator details...');
-      const creatorResponse = await fetch(`${API_BASE}/api/creators/username/${username}`);
+  // Fetch creator details
+  console.log('fetchCreatorData: Fetching creator details...');
+  const creatorResponse = await fetch(`${API_ENDPOINTS.creators}/username/${username}`);
       console.log('fetchCreatorData: Creator response status:', creatorResponse.status);
       if (!creatorResponse.ok) {
         throw new Error(`Creator not found (status: ${creatorResponse.status})`);
@@ -87,15 +83,70 @@ export default function CreatorProfilePage() {
       const creatorData = creatorResult.data;
       console.log('fetchCreatorData: Creator data received:', creatorData);
 
-      const token = localStorage.getItem('authToken');
+      // Ensure we have a valid token before making protected requests
+      const ensureValidToken = async () => {
+        try {
+          const token = localStorage.getItem('authToken');
+          if (!token) return null;
+
+          // Decode JWT payload safely to check expiry (no verification here)
+          const parts = token.split('.');
+          if (parts.length < 2) return token;
+          const payload = JSON.parse(atob(parts[1]));
+          const exp = payload.exp; // seconds since epoch
+          const now = Math.floor(Date.now() / 1000);
+
+          // If token is still valid, return it
+          if (exp && exp > now + 5) {
+            return token;
+          }
+
+          console.log('fetchCreatorData: Token expired or about to expire, attempting refresh...');
+
+          // Attempt to refresh by re-requesting backend token using OAuth marker
+          // This requires that the user is still signed into Supabase and we have their email
+          if (user && user.email) {
+            try {
+              const resp = await fetch(API_ENDPOINTS.auth.login, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email, password: 'oauth-login' })
+              });
+
+              if (resp.ok) {
+                const data = await resp.json();
+                if (data.success && data.data && data.data.token) {
+                  localStorage.setItem('authToken', data.data.token);
+                  console.log('fetchCreatorData: Token refreshed successfully');
+                  return data.data.token;
+                }
+              }
+              console.warn('fetchCreatorData: Token refresh request failed');
+            } catch (err) {
+              console.warn('fetchCreatorData: Token refresh error', err);
+            }
+          } else {
+            console.log('fetchCreatorData: No signed-in user available to refresh token');
+          }
+
+          return null;
+        } catch (err) {
+          console.error('fetchCreatorData: Token check failed', err);
+          return null;
+        }
+      };
+
+      const validToken = await ensureValidToken();
+      console.log('fetchCreatorData: Token from localStorage (post-check):', validToken ? `${validToken.substring(0,20)}...` : 'NO TOKEN');
       const headers: HeadersInit = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (validToken) {
+        headers['Authorization'] = `Bearer ${validToken}`;
+        console.log('fetchCreatorData: Authorization header set');
       }
 
       // Fetch creator's content
       console.log(`fetchCreatorData: Fetching content for creator ID: ${creatorData.id}`);
-      const contentResponse = await fetch(`${API_BASE}/api/content/creator/${creatorData.id}`, { headers });
+      const contentResponse = await fetch(`${API_ENDPOINTS.content}/creator/${creatorData.id}`, { headers });
       console.log('fetchCreatorData: Content response status:', contentResponse.status);
       
       let contentData: any[] = [];
@@ -183,7 +234,7 @@ export default function CreatorProfilePage() {
       console.log('fetchCreatorData: Fetch process finished.');
       setLoading(false);
     }
-  }, [username]);
+  }, [username, user]);
 
   useEffect(() => {
     fetchCreatorData();
@@ -191,23 +242,46 @@ export default function CreatorProfilePage() {
   
   const handleSubscribe = () => {
     if (!user) {
-      // Redirect to login
+      // Redirect to login or show login modal
+      alert('Please log in to subscribe to creators');
       return;
     }
     setShowPayPal(true);
   };
 
-  const handlePayPalSuccess = (subscriptionId: string) => {
-    console.log('PayPal subscription successful:', subscriptionId);
+  const handlePayPalSuccess = (subscriptionId: string, paymentMethod: string) => {
+    console.log('PayPal subscription successful:', { subscriptionId, paymentMethod });
+    
+    // Immediately update UI to reflect subscription
+    setIsSubscribed(true);
     setShowPayPal(false);
-    // Refetch data to show unlocked content
-    fetchCreatorData();
-    alert('Successfully subscribed! You now have access to all premium content.');
+    
+    // Refetch creator data to show unlocked content
+    // Use a small delay to allow webhook to potentially process
+    setTimeout(() => {
+      console.log('Refetching data after a short delay...');
+      fetchCreatorData();
+    }, 1500);
+    
+    // Show success message
+    alert(`🎉 Successfully subscribed with ${paymentMethod}! You now have access to all premium content from ${creator?.name}.`);
   };
 
   const handlePayPalError = (error: Error) => {
-    console.error('PayPal error:', error);
-    alert(`Subscription failed: ${error.message}`);
+    console.error('PayPal subscription error:', error);
+    setShowPayPal(false);
+    
+    // Show user-friendly error message
+    const friendlyMessage = error.message.includes('cancelled') 
+      ? 'Subscription was cancelled. You can try again anytime!'
+      : `Subscription failed: ${error.message}. Please try again or contact support.`;
+    
+    alert(friendlyMessage);
+  };
+
+  const handlePayPalCancel = () => {
+    console.log('PayPal subscription cancelled by user');
+    setShowPayPal(false);
   };
 
   const handleLike = async (contentId: string) => {
@@ -244,7 +318,7 @@ export default function CreatorProfilePage() {
     });
 
     try {
-      const response = await fetch(`http://localhost:5000/api/content/${contentId}/like`, {
+  const response = await fetch(`${API_ENDPOINTS.content}/${contentId}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -288,13 +362,6 @@ export default function CreatorProfilePage() {
       });
       alert('Failed to update like. Please try again.');
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
   };
 
   if (loading) {
@@ -395,9 +462,20 @@ export default function CreatorProfilePage() {
                     <Star className="w-4 h-4 text-yellow-400" />
                     <span>{creator.category}</span>
                   </div>
-                  <div className="flex items-center space-x-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{creator.location}</span>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-1">
+                      <MapPin className="w-4 h-4" />
+                      <span>{creator.location}</span>
+                    </div>
+                    {user && isSubscribed && (
+                      <button
+                        onClick={() => setShowMessaging(true)}
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Inbox</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -421,7 +499,7 @@ export default function CreatorProfilePage() {
                   </>
                 ) : (
                   <>
-                    <span>Subscribe for {formatCurrency(creator.subscriptionPrice)}</span>
+                    <span>Subscribe ${creator.subscriptionPrice}/month</span>
                     <ExternalLink className="w-4 h-4" />
                   </>
                 )}
@@ -566,21 +644,92 @@ export default function CreatorProfilePage() {
                 onClick={handleSubscribe}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-bold transition-all duration-200 transform hover:scale-105 shadow-lg"
               >
-                Subscribe for {formatCurrency(creator.subscriptionPrice)}
+                Subscribe ${creator.subscriptionPrice}/month
               </button>
             </motion.div>
           )}
         </motion.div>
       </div>
 
-      {/* PayPal Modal */}
-      <PayPalTopUp
-        isOpen={showPayPal}
-        onClose={() => setShowPayPal(false)}
-        onSuccess={handlePayPalSuccess}
-        onError={handlePayPalError}
-        creatorId={creator.id}
-      />
+      {/* Enhanced PayPal Subscription Modal */}
+      {showPayPal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 rounded-2xl border border-slate-700 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <img
+                    src={creator.avatar}
+                    alt={creator.name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Subscribe to {creator.name}</h3>
+                    <p className="text-slate-400">Monthly subscription</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPayPal(false)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Subscription Benefits */}
+              <div className="mb-6 p-4 bg-slate-800 rounded-lg border border-slate-700">
+                <h4 className="font-semibold text-white mb-3">What you'll get:</h4>
+                <ul className="space-y-2 text-sm text-slate-300">
+                  <li className="flex items-center space-x-2">
+                    <Heart className="w-4 h-4 text-red-400" />
+                    <span>Access to all premium photos and videos</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <Play className="w-4 h-4 text-blue-400" />
+                    <span>HD video content streaming</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <Star className="w-4 h-4 text-yellow-400" />
+                    <span>Support your favorite creator</span>
+                  </li>
+                  <li className="flex items-center space-x-2">
+                    <Lock className="w-4 h-4 text-green-400" />
+                    <span>Cancel anytime - no long-term commitment</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Enhanced PayPal Subscription Component */}
+              <PayPalEnhancedSubscription
+                amount={creator.subscriptionPrice.toFixed(2)}
+                currency="USD"
+                customerEmail={user?.email}
+                country="US"
+                planId={creator.id}
+                onSuccess={handlePayPalSuccess}
+                onError={handlePayPalError}
+                onCancel={handlePayPalCancel}
+                customization={{
+                  color: 'blue',
+                  shape: 'rect',
+                  layout: 'vertical',
+                  height: 45
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Messaging Modal */}
+      {showMessaging && creator && (
+        <MessagingModal
+          creatorId={creator.id}
+          creatorName={creator.name}
+          onClose={() => setShowMessaging(false)}
+        />
+      )}
     </div>
   );
 }

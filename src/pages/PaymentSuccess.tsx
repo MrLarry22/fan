@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { API_ENDPOINTS } from '../config/api';
 import { CheckCircle, Loader2 } from 'lucide-react';
 
 export default function PaymentSuccess() {
@@ -27,7 +28,7 @@ export default function PaymentSuccess() {
         }
 
         // Call backend to create the subscription
-        const response = await fetch('http://localhost:5000/api/subscriptions/subscribe', {
+  const response = await fetch(`${API_ENDPOINTS.subscriptions}/subscribe`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

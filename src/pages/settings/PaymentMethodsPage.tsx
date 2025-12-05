@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Plus } from 'lucide-react';
-import PayPalTopUp from '../../components/Payment/PayPalTopUp';
+// import PayPalTopUp from '../../components/Payment/PayPalTopUp'; // Removed: subscription-only
 
 export default function PaymentMethodsPage() {
   const [showPayPal, setShowPayPal] = useState(false);

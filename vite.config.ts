@@ -24,7 +24,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/uploads': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_URL || 'http://localhost:3001',
         changeOrigin: true
       }
     },

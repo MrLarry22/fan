@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import { API_ENDPOINTS } from '../config/api';
 import { CheckCircle, XCircle, Mail, RotateCcw } from 'lucide-react';
 
 export default function EmailVerificationPage() {
@@ -22,7 +23,7 @@ export default function EmailVerificationPage() {
 
   const verifyEmail = async (verificationToken: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/verify-email?token=${verificationToken}`);
+  const response = await fetch(`${API_ENDPOINTS.auth}/verify-email?token=${verificationToken}`);
       const data = await response.json();
 
       if (data.success) {
@@ -52,7 +53,7 @@ export default function EmailVerificationPage() {
     setIsResending(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/resend-verification', {
+  const response = await fetch(`${API_ENDPOINTS.auth}/resend-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

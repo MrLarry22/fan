@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -61,7 +62,7 @@ export default function SignInPage() {
 
   const handleResendVerification = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/resend-verification', {
+  const response = await fetch(`${API_ENDPOINTS.auth}/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: userEmail }),

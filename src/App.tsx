@@ -51,6 +51,7 @@ const PaymentSuccess = React.lazy(() => import('./pages/PaymentSuccess'));
 const PaymentCancel = React.lazy(() => import('./pages/PaymentCancel'));
 const ForgotPasswordPage = React.lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = React.lazy(() => import('./pages/ResetPasswordPage'));
+const PayPalTestPage = React.lazy(() => import('./pages/PayPalTestPage'));
 
 // Import Admin Guard
 const AdminGuard = React.lazy(() => import('./components/AdminProtection/AdminGuard'));
@@ -233,6 +234,7 @@ function AppRoutes() {
           {/* Payment Routes */}
           <Route path="/payment/success" element={<PaymentSuccess />} />
           <Route path="/payment/cancel" element={<PaymentCancel />} />
+          <Route path="/paypal-test" element={<PayPalTestPage />} />
           
           {/* Settings Routes */}
           <Route 

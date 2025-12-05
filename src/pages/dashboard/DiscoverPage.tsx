@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Search, Filter, Users } from 'lucide-react';
 
+import { API_ENDPOINTS } from '../../config/api';
+
 interface Creator {
   id: string;
   display_name: string;
@@ -15,7 +17,7 @@ interface Creator {
   created_at: string;
 }
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = API_ENDPOINTS.creators;
 
 export default function DiscoverPage() {
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -32,7 +34,7 @@ export default function DiscoverPage() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`${API_BASE_URL}/creators`);
+  const response = await fetch(`${API_BASE_URL}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
